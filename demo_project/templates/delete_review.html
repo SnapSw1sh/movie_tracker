@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Удалить рецензию — Demo-Project{% endblock %}
+{% block content %}
+<div class="container">
+  <h2>Вы действительно хотите удалить рецензию к «{{ review.work.title }}»?</h2>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit">Да, удалить</button>
+    <a href="{% url 'work_detail' review.work.pk %}">Нет, оставить</a>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Поиск — Demo-Project{% endblock %}
+{% block content %}
+<div class="container">
+  <h2>Результаты поиска по запросу «{{ query }}»</h2>
+
+  {% if not query %}
+    <p>Введите что-нибудь в поисковую строку.</p>
+  {% else %}
+    {% if review_results or work_results %}
+      {% if review_results %}
+        <h3>Рецензии</h3>
+        <ul>
+          {% for rev in review_results %}
+            <li>
+              <strong>Рецензия:</strong> «{{ rev.work.title }}» — {{ rev.text }}
+              <br><small>автор: {{ rev.user.username }}, {{ rev.created_at|timesince }} назад</small>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+
+      {% if work_results %}
+        <h3>Произведения</h3>
+        <ul>
+          {% for work in work_results %}
+            <li>
+              <strong>{{ work.get_type_display }}:</strong>
+              «{{ work.title }}» — рейтинг {{ work.rating }}/10
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% else %}
+      <p>Ничего не найдено.</p>
+    {% endif %}
+  {% endif %}
+
+</div>
+{% endblock %}

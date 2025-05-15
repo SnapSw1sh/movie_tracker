@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Регистрация — Demo-Project{% endblock %}
+
+{% block content %}
+<div class="container">
+  <section class="auth-form">
+    <h2>Регистрация</h2>
+    <form id="register-form" action="{% url 'register' %}" method="post" novalidate>
+      {% csrf_token %}
+      {{ form.as_p }}
+
+      <p id="password-match-message" style="color: #d9534f; display: none;">
+        Пароли не совпадают
+      </p>
+
+      <button type="submit" id="register-btn">Зарегистрироваться</button>
+    </form>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form     = document.getElementById('register-form');
+  const pwd1     = form.querySelector('input[name="password1"]');
+  const pwd2     = form.querySelector('input[name="password2"]');
+  const message  = document.getElementById('password-match-message');
+  const submitBtn= document.getElementById('register-btn');
+
+  function validatePasswords() {
+    if (!pwd1.value || !pwd2.value) {
+      message.style.display = 'none';
+      submitBtn.disabled = false;
+      return;
+    }
+    if (pwd1.value !== pwd2.value) {
+      message.style.display = 'block';
+      submitBtn.disabled = true;
+    } else {
+      message.style.display = 'none';
+      submitBtn.disabled = false;
+    }
+  }
+
+  if (pwd1 && pwd2 && message && submitBtn) {
+    pwd1.addEventListener('input', validatePasswords);
+    pwd2.addEventListener('input', validatePasswords);
+    validatePasswords();
+  }
+});
+</script>
+{% endblock %}

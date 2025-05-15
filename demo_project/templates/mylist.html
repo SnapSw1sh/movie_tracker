@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Мой список — Demo-Project{% endblock %}
+
+{% block content %}
+<div class="container">
+  <main>
+    <section class="add-item">
+      <h2>Добавить новое произведение</h2>
+      <form method="post">
+        {% csrf_token %}
+  
+        <div class="form-group">
+          <label for="ext-search">Произведение:</label>
+          <input
+            type="text"
+            id="ext-search"
+            class="form-control"
+            placeholder="Начните вводить название…"
+          >
+          <ul id="ext-list" class="typeahead-list"></ul>
+          {{ form.work.as_hidden }}
+        </div>
+        {% for field in form.visible_fields %}
+          {% if field.name != 'work' %}
+            <div class="form-group">
+              {{ field.label_tag }}
+              {{ field }}
+              {{ field.errors }}
+            </div>
+          {% endif %}
+        {% endfor %}
+
+        <button type="submit" class="btn btn-primary">Добавить</button>
+      </form>
+    </section>
+
+    <form method="get" class="filter-form">
+      <select name="type">
+        <option value="">Все типы</option>
+        {% for code,label in type_choices %}
+          <option value="{{ code }}" {% if code == current_type %}selected{% endif %}>
+            {{ label }}
+          </option>
+        {% endfor %}
+      </select>
+      <input
+        type="text"
+        name="genre"
+        placeholder="Жанр"
+        value="{{ current_genre }}"
+      />
+      <button type="submit">Применить</button>
+    </form>    
+
+    <section class="item-list">
+      <h2>Мой список</h2>
+      <div class="items">
+        {% for entry in mylist %}
+          {% with work=entry.work %}
+          <div class="card"
+               data-entry-id="{{ entry.id }}"
+               data-type="{{ work.type }}"
+               data-genre="{{ work.genre }}"
+               data-rating="{{ work.rating }}"
+               data-date="{{ work.release_date|date:'Y-m-d' }}">
+            <h3>{{ work.title }}</h3>
+            <p>Тип: {{ work.get_type_display }}</p>
+            <p>Статус:
+              <span
+                class="status-text"
+                data-status="{{ entry.status }}"
+                data-type="{{ work.type }}"
+              ></span>
+            </p>
+            <p class="detail">{{ entry.work.detail }}</p>
+            {% if entry.score %}
+              <p>Оценка: {{ entry.score }}/10</p>
+            {% endif %}
+            <div class="actions">
+              <button
+                type="button"
+                class="edit btn btn-primary"
+                data-url="{% url 'edit_list_entry' entry.pk %}">
+                Редактировать
+              </button>
+
+              <button
+                class="delete btn btn-danger"
+                data-url="{% url 'toggle_list' work.pk %}">
+                Удалить
+              </button>
+            </div>
+          </div>
+          {% endwith %}
+        {% empty %}
+          <p>Ваш список пока пуст.</p>
+        {% endfor %}
+        <div class="pagination">
+          {% if mylist.has_previous %}
+            <a href="?my_page={{ mylist.previous_page_number }}" class="page-link">&laquo; Назад</a>
+          {% endif %}
+          <span>Стр. {{ mylist.number }} из {{ mylist.paginator.num_pages }}</span>
+          {% if mylist.has_next %}
+            <a href="?my_page={{ mylist.next_page_number }}" class="page-link">Вперёд &raquo;</a>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+    <div id="edit-modal" class="modal" style="display:none;">
+      <div class="modal-content">
+        <span id="edit-modal-close" class="modal-close">&times;</span>
+        <div id="edit-modal-body"></div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const container = document.querySelector('.items');
+  if (container) {
+    Sortable.create(container, {
+      animation: 150,
+      onEnd: () => {
+        const order = Array.from(container.children)
+          .map(card => card.dataset.entryId);
+        fetch('/api/mylist/reorder/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+          },
+          body: JSON.stringify({ order })
+        });
+      }
+    });
+  }
+
+  function getCookie(name) {
+    let cookieValue = null;
+    document.cookie.split(';').forEach(c => {
+      c = c.trim();
+      if (c.startsWith(name + '=')) {
+        cookieValue = decodeURIComponent(c.slice(name.length + 1));
+      }
+    });
+    return cookieValue;
+  }
+
+  document.querySelectorAll('.delete').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      fetch(btn.dataset.url, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      })
+      .then(r => r.json())
+      .then(data => {
+        btn.closest('.card').remove();
+        if (data.work) {
+          const sel = document.querySelector('select[name="work"]');
+          const opt = document.createElement('option');
+          opt.value = data.work.id;
+          opt.textContent = data.work.title;
+          sel.appendChild(opt);
+        }
+      })
+      .catch(() => alert('Не удалось удалить. Попробуйте ещё раз.'));
+    });
+  });
+
+  const modal    = document.getElementById('edit-modal');
+  const body     = document.getElementById('edit-modal-body');
+  const closeBtn = document.getElementById('edit-modal-close');
+
+  document.querySelectorAll('.edit').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      const id = btn.closest('.card').dataset.entryId;
+      fetch(`/mylist/${id}/edit/`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      })
+      .then(r => r.json())
+      .then(data => {
+        body.innerHTML = data.html;
+        modal.style.display = 'block';
+        document.getElementById('edit-entry-form')
+          .addEventListener('submit', function(ev) {
+            ev.preventDefault();
+            fetch(`/mylist/${id}/edit/`, {
+              method: 'POST',
+              headers: { 'X-CSRFToken': getCookie('csrftoken') },
+              body: new FormData(this),
+            })
+            .then(r => r.json())
+            .then(res => {
+              if (!res.errors) {
+                const card = document.querySelector(`.card[data-entry-id="${id}"]`);
+                card.querySelector('.status').textContent = res.status;
+                card.querySelector('.score').textContent  = res.score;
+                modal.style.display = 'none';
+              }
+            });
+          });
+      });
+    });
+  });
+
+
+  closeBtn.addEventListener('click', () => modal.style.display = 'none');
+  window.addEventListener('click', e => {
+    if (e.target === modal) modal.style.display = 'none';
+  });
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const mapping = {
+    movie: {
+      want: 'Хочу посмотреть',
+      watching: 'Смотрю',
+      reading:    'Смотрю',
+      completed: 'Просмотрено',
+      rewatching: 'Пересматриваю',
+      paused: 'Приостановлено',
+      dropped: 'Брошено',
+    },
+    series: {
+      want: 'Хочу посмотреть',
+      watching: 'Смотрю',
+      reading:    'Смотрю',
+      completed: 'Просмотрено',
+      rewatching: 'Пересматриваю',
+      paused: 'Приостановлено',
+      dropped: 'Брошено',
+    },
+    book: {
+      want: 'Хочу прочитать',
+      reading: 'Читаю',
+      completed: 'Прочитано',
+      rereading: 'Перечитываю',
+      paused: 'Приостановлено',
+      dropped: 'Брошено',
+    },
+  };
+  
+  document.querySelectorAll('.status-text').forEach(el => {
+    const status = el.dataset.status;
+    const type   = el.dataset.type;
+    const text   = (mapping[type] || {})[status] || '';
+    el.textContent = text;
+  });
+});
+</script>
+<script>
+document.getElementById('follow-btn')?.addEventListener('click', function() {
+  const username = this.dataset.username;
+  fetch(`/profile/${username}/follow/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': '{{ csrf_token }}',
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+  .then(r=>r.json())
+  .then(data=>{
+    if (data.error) {
+      alert(data.error);
+    } else {
+      this.textContent = data.following ? 'Отписаться' : 'Подписаться';
+      this.classList.toggle('btn-secondary', data.following);
+      this.classList.toggle('btn-primary', !data.following);
+    }
+  });
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const extInput   = document.getElementById('ext-search');
+  const hintList   = document.getElementById('ext-list');
+  const workInput  = document.getElementById('id_work');  
+  let timer;
+
+  extInput.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = extInput.value.trim();
+    if (!q) { hintList.innerHTML = ''; return; }
+
+    timer = setTimeout(() => {
+      fetch(`/api/search/?q=${encodeURIComponent(q)}`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      })
+      .then(r => r.json())
+      .then(data => {
+        hintList.innerHTML = data.results.map(item => 
+          `<li data-id="${item.id}">
+            <span class="t-title">${item.title}</span>
+            <span class="t-meta">(${item.kind}${item.year ? ' - ' + item.year : ''})</span> 
+          </li>`
+        ).join('');
+      });
+    }, 300);
+  });
+
+  hintList.addEventListener('click', async e => {
+    const li = e.target.closest('li'); if (!li) return;
+    const externalId = li.dataset.id;
+           
+    extInput.value = li.textContent;
+    hintList.innerHTML = '';
+
+    const data = await fetch(`/api/import-movie/?id=${encodeURIComponent(externalId)}`, {
+      headers:{ 'X-Requested-With':'XMLHttpRequest' }
+    }).then(r => r.json());
+    
+
+
+    workInput.value = data.id;  
+  });
+
+
+  document.addEventListener('click', e => {
+    if (!extInput.contains(e.target) && !hintList.contains(e.target)) {
+      hintList.innerHTML = '';
+    }
+  });
+});
+</script>
+{% endblock %}

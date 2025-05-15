@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Профиль — Demo-Project{% endblock %}
+
+{% block content %}
+<div class="container">
+  <section class="profile">
+    <h2>Профиль пользователя</h2>
+    <div class="profile-header">
+      <img src="{{ user.profile.avatar.url }}" alt="Аватар" class="avatar">
+      <div class="profile-userinfo">
+        <h3 class="username">{{ user.username }}</h3>
+        <p class="description">{{ user.profile.description }}</p>
+
+        {% if request.user != user %}
+          <button
+            id="follow-btn"
+            data-username="{{ user.username }}"
+            class="btn btn-{{ is_following|yesno:'secondary,primary' }}">
+            {{ is_following|yesno:"Отписаться,Подписаться" }}
+          </button>
+        {% endif %}
+
+        {% if request.user == user %}
+          <a href="{% url 'profile_edit' %}" class="btn btn-primary">Редактировать профиль</a>
+        {% endif %}
+      </div>
+    </div>
+    <div class="profile-stats">
+      <h3>Статистика</h3>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <span class="stat-label">Просмотрено фильмов:</span>
+          <span class="stat-value">{{ stats.films }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Просмотрено сериалов:</span>
+          <span class="stat-value">{{ stats.series }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Прочитано книг:</span>
+          <span class="stat-value">{{ stats.books }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="profile-favorites">
+      <h3>Любимые произведения</h3>
+      <ul>
+        {% for fav in favorites %}
+          <li>«{{ fav.title }}» ({{ fav.get_type_display }})</li>
+        {% empty %}
+          <li>Пока нет любимых произведений.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('follow-btn');
+  if (!btn) return;
+
+  function getCookie(name) {
+    let cookieValue = null;
+    document.cookie.split(';').forEach(c => {
+      c = c.trim();
+      if (c.startsWith(name + '=')) {
+        cookieValue = decodeURIComponent(c.slice(name.length + 1));
+      }
+    });
+    return cookieValue;
+  }
+  const csrftoken = getCookie('csrftoken');
+
+  btn.addEventListener('click', () => {
+    const username = btn.dataset.username;
+    const url = `/profile/${username}/follow/`;
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrftoken,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.following) {
+        btn.textContent = 'Отписаться';
+        btn.classList.replace('btn-primary', 'btn-secondary');
+      } else {
+        btn.textContent = 'Подписаться';
+        btn.classList.replace('btn-secondary', 'btn-primary');
+      }
+    });
+  });
+});
+</script>
+{% endblock %}

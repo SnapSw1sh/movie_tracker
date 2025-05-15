@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Лента активности — Demo-Project{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h2>Лента активности</h2>
+  <div class="toggle-modes">
+    <a href="?mode=all"{% if mode == 'all' %} class="active"{% endif %}>Все</a> |
+    <a href="?mode=following"{% if mode == 'following' %} class="active"{% endif %}>Отслеживаемые</a>
+  </div>
+  <ul class="activities">
+    {% for act in activities %}
+      <li>
+        <strong>{{ act.user.username }}</strong> — {{ act.description }}
+        <br><small>{{ act.timestamp|timesince }} назад</small>
+      </li>
+    {% empty %}
+      <li>Активностей нет.</li>
+    {% endfor %}
+  </ul>
+</div>
+<script>
+document.getElementById('load-more')?.addEventListener('click', function() {
+    const btn    = this;
+    const next   = btn.dataset.nextPage;
+    const params = new URLSearchParams(location.search);
+    const mode   = params.get('mode') || 'all';
+    
+    fetch(`{% url 'activity_feed' %}?mode=${mode}&page=${next}`, {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+    const ul = document.getElementById('activity-list');
+    data.activities.forEach(act => {
+        const li = document.createElement('li');
+        li.innerHTML = `<strong>${act.user}</strong> — ${act.description}
+        <br><small>${act.timestamp}</small>`;
+        ul.appendChild(li);
+    });
+    if (data.has_next) {
+        btn.dataset.nextPage = data.next_page;
+    } else {
+        btn.remove();
+    }
+    })
+    .catch(console.error);
+});
+</script>    
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Каталог — Demo-Project{% endblock %}
+{% block content %}
+<div class="container">
+  <h2>Каталог произведений</h2>
+
+  <form method="get" class="filter-form">
+    <select name="type">
+      <option value="">Все типы</option>
+      {% for code,label in type_choices %}
+        <option value="{{ code }}"
+          {% if code == current_type %}selected{% endif %}>
+          {{ label }}
+        </option>
+      {% endfor %}
+    </select>
+    <input type="text" name="genre" placeholder="Жанр"
+           value="{{ current_genre }}" />
+    <button type="submit">Фильтровать</button>
+  </form>
+
+  <div class="works-grid">
+    {% for work in works %}
+      <div class="card">
+        <h3>«{{ work.title }}»</h3>
+        <p>{{ work.get_type_display }}{% if work.genre %}, {{ work.genre }}{% endif %}</p>
+        {% if work.rating %}<p>Рейтинг: {{ work.rating }}/10</p>{% endif %}
+        <a href="{% url 'work_detail' work.pk %}">Подробнее</a>
+      </div>
+    {% empty %}
+      <p>Ничего не найдено.</p>
+    {% endfor %}
+  </div>
+
+  <div class="pagination">
+    {% if works.has_previous %}
+      <a href="?page={{ works.previous_page_number }}&type={{ current_type }}&genre={{ current_genre }}">⟨ Назад</a>
+    {% endif %}
+    <span>Стр. {{ works.number }} из {{ works.paginator.num_pages }}</span>
+    {% if works.has_next %}
+      <a href="?page={{ works.next_page_number }}&type={{ current_type }}&genre={{ current_genre }}">Вперёд ⟩</a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

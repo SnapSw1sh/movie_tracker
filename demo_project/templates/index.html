@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Movie Tracker{% endblock %}
+
+{% block content %}
+<div class="container home-container">
+  <section class="activities">
+    <h2>Активность пользователей</h2>
+    <div class="toggle-modes">
+      <a href="?mode=all"{% if mode != 'following' %} class="active"{% endif %}>Все</a> |
+      <a href="?mode=following"{% if mode == 'following' %} class="active"{% endif %}>Отслеживаемые</a>
+    </div>
+  
+    <div id="activity-list">
+      {% for act in activities %}
+        <div class="activity-card">
+          <div class="activity-user">
+            {# аватар #}
+            {% if act.user.profile.avatar %}
+              <img src="{{ act.user.profile.avatar.url }}" alt="" class="avatar-mini">
+            {% else %}
+              <img src="{% static 'img/default-avatar.png' %}" alt="" class="avatar-mini">
+            {% endif %}
+            <span class="username">{{ act.user.username }}</span>
+          </div>
+    
+          <div class="activity-content">
+            <p>{{ act.description }}</p>
+            <span class="activity-time">
+              {{ act.timestamp|date:"j M Y, H:i" }}
+            </span>
+          </div>
+        </div>
+      {% empty %}
+        <p>Активностей нет.</p>
+      {% endfor %}
+    </div>
+  
+    {% if activities.has_next %}
+      <button id="load-more" data-next-page="{{ activities.next_page_number }}">Загрузить ещё</button>
+    {% endif %}
+  </section>
+
+  <aside class="reviews">
+    <h2>Последние рецензии</h2>
+    {% for review in reviews %}
+      <div class="review-card" data-review-id="{{ review.id }}">
+        <div class="review-header">
+          {% if review.user.profile.avatar %}
+            <img src="{{ review.user.profile.avatar.url }}" alt="avatar" class="avatar-mini">
+          {% else %}
+            <img src="{% static 'img/default-avatar.png' %}" alt="avatar" class="avatar-mini">
+          {% endif %}
+          <div>
+            <span class="username">{{ review.user.username }}</span>
+            <span class="review-work-title">«{{ review.work.title }}»</span>
+          </div>
+        </div>
+        <div class="review-body">
+          <p>{{ review.text }}</p>
+        </div>
+        <div class="review-actions">
+          {% if user.is_authenticated %}
+            <button class="vote-btn btn btn-sm btn-light" data-value="1">👍</button>
+            <span class="vote-count">{{ review.vote_sum }}</span>
+            <button class="vote-btn btn btn-sm btn-light" data-value="-1">👎</button>
+          {% else %}
+            <button class="like-btn">❤ {{ review.rating }}</button>
+          {% endif %}
+        </div>
+        {% if user.is_authenticated %}
+          <div class="review-comment-btn" style="margin-top:0.5em;">
+            <a
+              href="{% url 'work_detail' review.work.pk %}#review-{{ review.id }}"
+              class="btn btn-sm btn-link"
+            >
+              Ответить
+            </a>
+          </div>
+        {% else %}
+          <div class="review-comment-btn" style="margin-top:0.5em;">
+            <a 
+              href="{% url 'login' %}?next={% url 'work_detail' review.work.pk %}#review-{{ review.id }}"
+              class="btn btn-sm btn-link"
+            >
+              Войдите, чтобы ответить
+            </a>
+          </div>
+        {% endif %}
+      </div>
+    {% empty %}
+      <p>Рецензий пока нет.</p>
+    {% endfor %}
+
+    <div class="pagination">
+      {% if reviews.has_previous %}
+        <a href="?page={{ reviews.previous_page_number }}" class="page-link">&laquo; Назад</a>
+      {% endif %}
+      <span>Стр. {{ reviews.number }} из {{ reviews.paginator.num_pages }}</span>
+      {% if reviews.has_next %}
+        <a href="?page={{ reviews.next_page_number }}" class="page-link">Вперёд &raquo;</a>
+      {% endif %}
+    </div>
+  </aside>
+</div>
+
+<section class="popular">
+  <div class="container">
+    <h2>Новые популярные</h2>
+    <div class="popular-items">
+      {% for item in popular_items %}
+        <div class="card popular-card"
+             data-type="{{ item.type }}"
+             data-genre="{{ item.genre }}"
+             data-rating="{{ item.rating }}"
+             data-date="{{ item.release_date|date:'Y-m-d' }}">
+          <a href="{% url 'work_detail' item.pk %}">
+            {% if item.cover_url %}
+              <img src="{{ item.cover_url }}" alt="{{ item.title }}"/>
+            {% endif %}
+            <h3>{{ item.title }}</h3>
+          </a>
+          <p>{{ item.get_type_display }}</p>
+          <p>🌟 {{ item.avg_score|floatformat:1 }} ({{ item.entries_count }})</p>
+        </div>
+      {% empty %}
+        <p>Пока нет популярных работ.</p>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  function getCookie(name) {
+    let cookieValue = null;
+    document.cookie.split(';').forEach(c => {
+      const cookie = c.trim();
+      if (cookie.startsWith(name + '=')) {
+        cookieValue = decodeURIComponent(cookie.slice(name.length + 1));
+      }
+    });
+    return cookieValue;
+  }
+  const csrftoken = getCookie('csrftoken');
+
+  document.querySelectorAll('.vote-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      const card = this.closest('[data-review-id]');
+      const reviewId = card.dataset.reviewId;
+      const value    = this.dataset.value;
+
+      fetch("{% url 'vote_review' %}", {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': csrftoken,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({ review: reviewId, value: value })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.score !== undefined) {
+          card.querySelector('.vote-count').textContent = data.score;
+        }
+      });
+    });
+  });
+});
+</script>
+<script>
+document.getElementById('load-more')?.addEventListener('click', () => {
+  const btn = document.getElementById('load-more');
+  const nextPage = btn.dataset.nextPage;
+  const params = new URLSearchParams(window.location.search);
+  params.set('page_activities', nextPage);
+  fetch(`/?${params.toString()}`, {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(r => r.text())
+  .then(html => {
+    const tmp = document.createElement('template');
+    tmp.innerHTML = html;
+    const newItems = tmp.content.querySelectorAll('#activity-list li');
+    newItems.forEach(li => document.getElementById('activity-list').append(li));
+    const newBtn = tmp.content.querySelector('#load-more');
+    if (newBtn) {
+      btn.dataset.nextPage = newBtn.dataset.nextPage;
+    } else {
+      btn.remove();
+    }
+  });
+});
+</script>  
+{% endblock %}
+

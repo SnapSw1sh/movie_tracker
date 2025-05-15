@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+  <h1>{{ work.title }}</h1>
+  <p>Тип: {{ work.get_type_display }}{% if work.genre %}, Жанр: {{ work.genre }}{% endif %}</p>
+  <p>Рейтинг: {{ work.rating }}/10</p>
+
+  <section class="reviews">
+    <h2>Рецензии</h2>
+
+    {% if user.is_authenticated %}
+      <form action="" method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">Отправить</button>
+      </form>
+    {% else %}
+      <p><a href="{% url 'login' %}">Войдите</a>, чтобы оставить рецензию.</p>
+    {% endif %}
+
+    <hr>
+
+    {% for review in reviews %}
+      <div class="review" data-review-id="{{ review.id }}">
+        <p>{{ review.text }}</p>
+        <p>Автор: {{ review.user.username }}</p>
+        <p>
+          Голоса:
+          <span class="vote-count">
+            {{ review.vote_sum }}
+          </span>
+        </p>
+        <button class="vote-btn btn btn-sm btn-light" data-value="1" title="Лайк">👍</button>
+        <button class="vote-btn btn btn-sm btn-light" data-value="-1" title="Дизлайк">👎</button>
+
+
+        {% if user.is_authenticated %}
+          <button
+            type="button"
+            class="new-comment-btn btn btn-xs btn-link"
+            data-id="new-{{ review.id }}"
+          >
+            Ответить
+          </button>
+          <form
+            action="{% url 'add_comment' review.id %}"
+            method="post"
+            class="new-comment-form form-new-{{ review.id }}"
+            style="display:none; margin-left:1.5em;"
+          >
+            {% csrf_token %}
+            {{ comment_form.text }}
+            <button type="submit" class="btn btn-primary btn-sm">
+             Отправить
+            </button>
+          </form>
+        {% endif %}
+
+        <div class="comments">
+          {% for comment in review.comments.all %}
+            {% if comment.parent is None %}
+              <div class="comment" id="c-{{ comment.id }}">
+                <p>
+                  <strong>{{ comment.user.username }}</strong>
+                  <small>{{ comment.created_at|timesince }} назад</small>
+                </p>
+                <p>{{ comment.text }}</p>
+
+                {% for reply in comment.replies.all %}
+                  <div class="reply" style="margin-left:2em; margin-top:0.5em;">
+                    <p>
+                      <strong>{{ reply.user.username }}</strong>
+                      <small>{{ reply.created_at|timesince }} назад</small>
+                    </p>
+                    <p>{{ reply.text }}</p>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+      </div>
+    <hr>
+    {% empty %}
+      <p>Пока нет рецензий.</p>
+    {% endfor %}
+  </section>
+
+  <section class="work-actions">
+    {% if user.is_authenticated %}
+      {% if in_list %}
+        <a href="{% url 'toggle_list' work.pk %}"
+           class="btn btn-secondary js-toggle-list">
+          Удалить из списка
+        </a>
+      {% else %}
+        <a href="{% url 'toggle_list' work.pk %}"
+           class="btn btn-primary js-toggle-list">
+          Добавить в мой список
+        </a>
+      {% endif %}
+    {% else %}
+      <p><a href="{% url 'login' %}">Войдите</a>, чтобы добавлять в «Мой список».</p>
+    {% endif %}
+  </section>
+</div>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+  document.querySelectorAll('.js-toggle-list').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      fetch(this.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.json())
+        .then(data => {
+          if (data.in_list) {
+            this.textContent = 'Удалить из списка';
+            this.classList.replace('btn-primary','btn-secondary');
+          } else {
+            this.textContent = 'Добавить в мой список';
+            this.classList.replace('btn-secondary','btn-primary');
+          }
+        });
+    });
+  });
+
+
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      document.cookie.split(';').forEach(c => {
+        const cookie = c.trim();
+        if (cookie.startsWith(name + '=')) {
+          cookieValue = decodeURIComponent(cookie.slice(name.length+1));
+        }
+      });
+    }
+    return cookieValue;
+  }
+  const csrftoken = getCookie('csrftoken');
+
+
+  document.querySelectorAll('.vote-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      const div      = this.closest('.review');
+      const reviewId = div.dataset.reviewId;
+      const value    = this.dataset.value;
+
+      fetch("{% url 'vote_review' %}", {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': csrftoken,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({ review: reviewId, value: value })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.score !== undefined) {
+          div.querySelector('.vote-count').textContent = data.score;
+        }
+      });
+    });
+  });
+
+
+  document.querySelectorAll('.new-comment-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id   = btn.dataset.id.replace('new-', '');
+      const form = document.querySelector('.form-new-' + id);
+      form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    });
+  });
+
+
+  document.querySelectorAll('.reply-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id   = btn.dataset.id;
+      const form = document.querySelector('.rform-' + id);
+      form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    });
+  });
+});
+</script>
+{% endblock %}

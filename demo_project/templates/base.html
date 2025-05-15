@@ -1,0 +1,89 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}Movie Tracker{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/main.css' %}" />
+</head>
+<body>
+  <header>
+    <div class="header-container">
+      <div class="logo"><a href="{% url 'index' %}">Movie Tracker</a></div>
+      <nav class="nav-links">
+        <ul>
+          <li><a href="{% url 'index' %}"     class="{% if request.resolver_match.url_name == 'index' %}active{% endif %}">Главная</a></li>
+          <li><a href="{% url 'mylist' %}"    class="{% if request.resolver_match.url_name == 'mylist' %}active{% endif %}">Мой список</a></li>
+          <li><a href="{% url 'profile' %}"   class="{% if request.resolver_match.url_name == 'profile' %}active{% endif %}">Профиль</a></li>
+          {% if user.is_authenticated %}
+          <li><a href="{% url 'logout' %}">Выход</a></li>
+          {% else %}
+          <li><a href="{% url 'login' %}">Вход</a></li>
+          <li><a href="{% url 'register' %}"class="{% if request.resolver_match.url_name == 'register' %}active{% endif %}">Регистрация</a></li>
+          {% endif %}
+          <li>
+            <a
+              href="{% url 'works_list' %}"
+              class="{% if request.resolver_match.url_name == 'works_list' %}active{% endif %}"
+            >
+              Каталог
+            </a>
+          </li>          
+        </ul>
+      </nav>
+      <div class="header-search" style="position:relative;">
+        <form id="header-search-form" action="{% url 'search' %}" method="get" autocomplete="off">
+          <input id="header-search-input" type="text" name="q" placeholder="Поиск…" aria-label="Поиск">
+          <button type="submit">Искать</button>
+          <ul id="typeahead-list" class="typeahead-list"></ul>
+        </form>
+      </div>
+    </div>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('header-search-input');
+    const list  = document.getElementById('typeahead-list');
+    let timer;
+    
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      const q = input.value.trim();
+      if (!q) {
+        list.innerHTML = '';
+        return;
+      }
+      timer = setTimeout(() => {
+        const base = window.location.origin;
+        fetch(`${base}/api/works/?search=${encodeURIComponent(q)}`)
+          .then(res => res.json())
+          .then(data => {
+            const arr = Array.isArray(data) ? data : data.results;
+            list.innerHTML = arr.map(w =>
+              `<li class="typeahead-item" data-pk="${w.id}">
+                 ${w.title}
+               </li>`
+            ).join('');
+          });
+      }, 300);
+    });
+    
+    list.addEventListener('click', e => {
+      if (!e.target.matches('.typeahead-item')) return;
+      input.value = e.target.textContent.trim();
+      list.innerHTML = '';
+      document.getElementById('header-search-form').submit();
+    });
+    
+    document.addEventListener('click', e => {
+      if (!input.contains(e.target) && !list.contains(e.target)) {
+        list.innerHTML = '';
+      }
+    });
+  });
+  </script>      
+</body>
+</html>
