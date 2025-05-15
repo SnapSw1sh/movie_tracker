@@ -3,8 +3,8 @@ git clone https://github.com/SnapSw1sh/movie_tracker.git
 cd demo-project
 
 # 2 . Создаём и активируем виртуальное окружение
-python -m venv .venv
-source .venv/bin/activate        # Windows: .\.venv\Scripts\activate
+#в VS code откройте палитру (Ctrl+Shift+P) → Python: Select Interpreter, выберите Создание виртуальной среды...        
+.venv\Scripts\activate
 
 # 3 . Ставим зависимости
 pip install -r requirements.txt
