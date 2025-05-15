@@ -1,5 +1,5 @@
 # 1 . Клонируем репозиторий
-git clone https://github.com/SnapSw1sh/movie-tracker.git
+git clone https://github.com/SnapSw1sh/movie_tracker.git
 cd demo-project
 
 # 2 . Создаём и активируем виртуальное окружение
